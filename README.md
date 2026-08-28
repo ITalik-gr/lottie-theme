@@ -238,8 +238,10 @@ Deliberately, and in roughly this order:
 ## Deployment
 
 The editor is a static Next.js app with no backend of its own. On Vercel, point the
-project at this repository — the build command and output directory are in
-`vercel.json`, and no environment variables are needed. The dev-only bridge to a local
+project at this repository and set **Root Directory** to `apps/web`; the Next.js preset
+handles the rest, and no environment variables are needed. Do not override the output
+directory — with a root directory set, Vercel resolves it relative to that, and a path
+like `apps/web/.next` becomes `apps/web/apps/web/.next`. The dev-only bridge to a local
 `lotties/` folder (`app/api/local/route.dev.ts`) is excluded from production builds by
 `pageExtensions`, which is what keeps the shipped app a pile of static files.
 
