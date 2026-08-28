@@ -206,7 +206,7 @@ claude                            # the agent, already wired to this folder`}
           and as an MCP server so an AI agent can edit through the same core.
         </p>
         <a
-          href="https://www.italik.dev/"
+          href="https://www.italik.dev/?ref=lottie-editor"
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-[12px] text-[var(--color-fg-dim)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-fg)]"

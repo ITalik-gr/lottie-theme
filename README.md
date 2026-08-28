@@ -247,7 +247,7 @@ like `apps/web/.next` becomes `apps/web/apps/web/.next`. The dev-only bridge to 
 
 ## Credits
 
-Built by [italik.dev](https://www.italik.dev/). Source at
+Built by [italik.dev](https://www.italik.dev/?ref=lottie-editor). Source at
 [github.com/ITalik-gr/lottie-theme](https://github.com/ITalik-gr/lottie-theme).
 
 ## Licence

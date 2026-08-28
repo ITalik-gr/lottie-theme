@@ -121,7 +121,7 @@ export default function Docs() {
       <footer className="mt-14 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--color-ink-3)] pt-5 text-[13px] text-[var(--color-fg-mute)]">
         <span>Corrections welcome — this was derived from a real corpus, not from the spec.</span>
         <a
-          href="https://www.italik.dev/"
+          href="https://www.italik.dev/?ref=lottie-editor"
           target="_blank"
           rel="noreferrer"
           className="ml-auto inline-flex items-center gap-1 hover:text-[var(--color-fg)]"

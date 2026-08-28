@@ -60,7 +60,7 @@ export default function EditorPage() {
             </span>
           )}
           <a
-            href="https://www.italik.dev/"
+            href="https://www.italik.dev/?ref=lottie-editor"
             target="_blank"
             rel="noreferrer"
             className={cn(
