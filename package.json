@@ -1,0 +1,20 @@
+{
+  "name": "lottie-theme-studio",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "pnpm --filter @lottie-theme/web dev",
+    "sync": "node packages/sync/src/bin.ts",
+    "build": "pnpm -r build",
+    "test": "pnpm --filter @lottie-theme/core --filter @lottie-theme/sync --filter @lottie-theme/mcp test",
+    "typecheck": "pnpm -r typecheck",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

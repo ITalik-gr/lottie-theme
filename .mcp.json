@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lottie-theme": {
+      "command": "node",
+      "args": ["packages/mcp/src/server.ts"]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@lottie-theme/sync",
+  "version": "0.1.0",
+  "description": "Live bridge between the Lottie Theme Studio editor and a local agent.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./protocol": "./src/protocol.ts"
+  },
+  "bin": { "lottie-theme-sync": "./src/bin.ts" },
+  "scripts": {
+    "start": "node src/bin.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lottie-theme/core": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

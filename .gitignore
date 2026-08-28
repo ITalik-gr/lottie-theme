@@ -1,0 +1,9 @@
+node_modules/
+.next/
+dist/
+out/
+.DS_Store
+*.tsbuildinfo
+.tmp-refs/
+lotties/
+lotties-light/

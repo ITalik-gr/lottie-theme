@@ -1,0 +1,48 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Lottie Recolor Studio</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.45 -apple-system,system-ui,sans-serif;background:#0e0f12;color:#e6e8ef;display:grid;grid-template-columns:290px 1fr 340px;height:100vh}
+.col{overflow:auto;padding:12px}
+#files{border-right:1px solid #23252c}
+#side{border-left:1px solid #23252c}
+h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8b8f9c}
+.f{padding:5px 7px;border-radius:6px;cursor:pointer;font-size:12px;color:#c3c7d2;word-break:break-all}
+.f:hover{background:#1b1d23}.f.on{background:#2440ff;color:#fff}
+.dir{margin:10px 0 4px;font-size:10px;color:#6a6e7a;text-transform:uppercase}
+#stage{display:flex;flex-direction:column;align-items:center;gap:12px;justify-content:center}
+#box{border-radius:14px;padding:10px;display:flex;align-items:center;justify-content:center}
+#anim{width:min(70vh,520px);height:min(70vh,520px)}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+button,select,input[type=text]{background:#1b1d23;color:#e6e8ef;border:1px solid #2c2f38;border-radius:7px;padding:6px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:#4c6efc}
+button.p{background:#2440ff;border-color:#2440ff;color:#fff}
+.sw{display:flex;gap:8px;align-items:center;padding:7px;border-radius:9px;background:#15171c;margin-bottom:7px}
+.sw .chip{width:26px;height:26px;border-radius:6px;border:1px solid #3a3d47;flex:0 0 auto}
+.sw code{font-size:11px}
+.sw .n{color:#7f8492;font-size:11px}
+.sw input[type=color]{width:30px;height:26px;padding:0;border:1px solid #3a3d47;border-radius:6px;background:none}
+.sw .hexin{width:78px;font-size:11px;padding:4px 6px}
+.sw button{padding:3px 7px;font-size:11px}
+.sw.hl{outline:2px solid #ff00ff}
+small{color:#7f8492}
+</style></head><body>
+<div class="col" id="files"><h3>Lottie files</h3><div id="tree"></div></div>
+<div class="col" id="stage">
+  <div id="box"><div id="anim"></div></div>
+  <div class="row">
+    <button id="play">⏯</button>
+    <select id="bg"><option value="#FFFFFF" selected>bg white</option><option value="#F6F8FF">bg #F6F8FF</option><option value="#0e0f12">bg dark</option><option value="#181818">bg #181818</option></select>
+    <label><input type="checkbox" id="cmp"> compare original</label><label><input type="checkbox" id="chk"> checkerboard</label>
+  </div>
+  <div id="name"><small>select a file</small></div>
+</div>
+<div class="col" id="side">
+  <h3>Palette</h3>
+  <div class="row"><button id="reset">Reset</button><button id="dl" class="p">Download JSON</button><button id="cli">Copy CLI map</button></div>
+  <div class="row"><select id="preset"><option value="">apply preset…</option></select></div>
+  <div id="pal"></div>
+  <h3 style="margin-top:14px">Presets</h3>
+  <div id="ptxt"></div>
+</div>
+<script src="vendor/lottie.min.js"></script><script src="app.js"></script></body></html>
