@@ -146,6 +146,17 @@ export function FileTree() {
       return next;
     });
 
+  const importFiles = async (list: FileList | File[]) => {
+    setError(null);
+    try {
+      const loaded = await filesFromInput(list);
+      addFiles(loaded);
+      if (loaded[0]) openFile(loaded[0].id, loaded[0].doc);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'could not read uploaded file');
+    }
+  };
+
   // The corpus is re-listed on a timer, not once: an agent recolouring files in the
   // terminal writes new ones into the folder, and having to reload the page to see them
   // is the difference between watching the work and hunting for it. Polling stops if the
@@ -238,9 +249,7 @@ export function FileTree() {
       onDrop={async (e) => {
         e.preventDefault();
         setDragging(false);
-        const loaded = await filesFromInput(e.dataTransfer.files);
-        addFiles(loaded);
-        if (loaded[0]) openFile(loaded[0].id, loaded[0].doc);
+        await importFiles(e.dataTransfer.files);
       }}
     >
       <header className="flex h-10 shrink-0 items-center gap-1 px-3">
@@ -275,9 +284,8 @@ export function FileTree() {
           className="hidden"
           onChange={async (e) => {
             if (!e.target.files) return;
-            const loaded = await filesFromInput(e.target.files);
-            addFiles(loaded);
-            if (loaded[0]) openFile(loaded[0].id, loaded[0].doc);
+            await importFiles(e.target.files);
+            e.target.value = '';
           }}
         />
       </header>

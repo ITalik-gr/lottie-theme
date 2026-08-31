@@ -9,12 +9,18 @@ export async function filesFromInput(list: FileList | File[]): Promise<LoadedFil
     if (!file.name.endsWith('.json')) continue;
     // `webkitRelativePath` is set when the user picked a folder, empty for a plain drop.
     const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+    let doc: unknown;
+    try {
+      doc = JSON.parse(await file.text());
+    } catch {
+      throw new Error(`could not read ${file.name}: invalid JSON`);
+    }
     out.push({
       id: `upload:${rel}`,
       name: file.name,
       dir: rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : 'dropped files',
       source: 'upload',
-      doc: JSON.parse(await file.text()),
+      doc,
     });
   }
   return out;
