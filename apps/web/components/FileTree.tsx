@@ -8,7 +8,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEditor } from '@/lib/store';
-import { filesFromInput, loadLocal, localCorpus } from '@/lib/files';
+import { useLottieDrop } from '@/lib/drop';
+import { filesFromInput, loadLocal, localCorpus, rejectionMessage } from '@/lib/files';
 import { cn } from '@/lib/utils';
 
 /** The inline field both folders and files rename through. Escape abandons the edit,
@@ -129,7 +130,7 @@ export function FileTree() {
   const renameFolder = useEditor((s) => s.renameFolder);
   const picker = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const drop = useLottieDrop();
   /** Folders the user has closed. Absent means open, so a new folder appears expanded. */
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -220,6 +221,22 @@ export function FileTree() {
     return acc;
   }, {});
 
+  /** The name each file shows when it has no alias, numbered where a folder holds more
+   *  than one file of that name. Built once per render rather than per row: the corpus
+   *  runs to seventy files and this would otherwise be a scan inside a scan. */
+  const defaultLabels = new Map<string, string>();
+  for (const branches of Object.values(roots)) {
+    for (const entries of Object.values(branches)) {
+      const seen = new Map<string, number>();
+      for (const f of entries) {
+        const plain = f.name.replace(/\.json$/, '');
+        const nth = (seen.get(f.name) ?? 0) + 1;
+        seen.set(f.name, nth);
+        defaultLabels.set(f.id, nth > 1 ? `${plain} (${nth})` : plain);
+      }
+    }
+  }
+
   /** Every folder that has a header, so one click can close or open the lot. */
   const folderKeys = Object.entries(roots).flatMap(([root, branches]) => [
     root,
@@ -229,19 +246,11 @@ export function FileTree() {
 
   return (
     <div
-      className={cn('flex h-full flex-col overflow-hidden', dragging && 'bg-[var(--color-brand)]/5')}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={async (e) => {
-        e.preventDefault();
-        setDragging(false);
-        const loaded = await filesFromInput(e.dataTransfer.files);
-        addFiles(loaded);
-        if (loaded[0]) openFile(loaded[0].id, loaded[0].doc);
-      }}
+      className={cn(
+        'flex h-full flex-col overflow-hidden',
+        drop.dragging && 'bg-[var(--color-brand)]/5 ring-1 ring-[var(--color-brand)]/40 ring-inset',
+      )}
+      {...drop.handlers}
     >
       <header className="flex h-10 shrink-0 items-center gap-1 px-3">
         <h2 className="panel-title flex-1">Files</h2>
@@ -275,18 +284,29 @@ export function FileTree() {
           className="hidden"
           onChange={async (e) => {
             if (!e.target.files) return;
-            const loaded = await filesFromInput(e.target.files);
+            const { files: loaded, rejected } = await filesFromInput(e.target.files);
+            setError(rejectionMessage(rejected));
             addFiles(loaded);
             if (loaded[0]) openFile(loaded[0].id, loaded[0].doc);
+            // Without this the same file cannot be picked twice in a row: the input keeps
+            // its value and no change event fires.
+            e.target.value = '';
           }}
         />
       </header>
 
-      {error && (
-        <p className="mx-2 mb-2 flex items-center gap-1.5 rounded-md bg-[var(--color-destructive)]/10 px-2 py-1.5 text-[12px] text-[var(--color-destructive)]">
+      {(error ?? drop.error) && (
+        <button
+          onClick={() => {
+            setError(null);
+            drop.clearError();
+          }}
+          title="dismiss"
+          className="mx-2 mb-2 flex items-center gap-1.5 rounded-md bg-[var(--color-destructive)]/10 px-2 py-1.5 text-left text-[12px] text-[var(--color-destructive)]"
+        >
           <AlertCircle className="size-3.5 shrink-0" />
-          {error}
-        </p>
+          {error ?? drop.error}
+        </button>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -338,7 +358,11 @@ export function FileTree() {
                       {(sub === '.' || expanded) &&
                         entries.map((f) => {
                           const active = f.id === currentId;
-                          const plain = f.name.replace(/\.json$/, '');
+                          // Two different files can share a name now that the id is keyed
+                          // by contents rather than by path. Identical rows would be
+                          // unusable, so repeats are numbered and the first keeps the bare
+                          // name — what a file manager does.
+                          const plain = defaultLabels.get(f.id)!;
                           const label = aliases.files[f.id] ?? plain;
                           if (editingId === f.id) {
                             return (

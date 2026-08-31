@@ -131,6 +131,10 @@ interface EditorState {
   highlightKey: string | null;
   /** Property the user picked — what the slot panel edits. */
   selectedKey: string | null;
+  /** Effect colour path, when the pick is a Drop Shadow (or similar) rather than a slot.
+   *  Effects sit outside the slot list on purpose — inserting them would renumber every
+   *  saved colour map — so they need their own address. Exclusive with `selectedKey`. */
+  selectedEffectPath: string | null;
   /** Multi-selection, for building a group out of several colours at once. */
   selectedKeys: string[];
   /** Dim everything except the highlighted element. */
@@ -155,6 +159,11 @@ interface EditorState {
 
   undoStack: Step[];
   redoStack: Step[];
+
+  /** The agent is mid-run. In the store rather than in its panel because two things
+   *  outside the panel need it: the guard that asks before the page is closed, and the
+   *  file tree, which must not swap the document out from under a request in flight. */
+  agentBusy: boolean;
 
   setFiles: (files: LoadedFile[]) => void;
   /** Replace the local corpus listing while keeping dropped files and loaded documents —
@@ -195,6 +204,9 @@ interface EditorState {
   setHighlight: (hex: string | null) => void;
   setHighlightKey: (key: string | null) => void;
   selectProperty: (key: string | null) => void;
+  selectEffect: (path: string | null) => void;
+  /** Recolour one effect parameter. Keyed by path, never by slot index. */
+  setEffectColor: (path: string, toHex: string) => void;
   toggleSelected: (key: string) => void;
   clearSelection: () => void;
   toggleXray: () => void;
@@ -206,6 +218,7 @@ interface EditorState {
   selectRamp: (path: string | null) => void;
   /** Move the colour stops of one ramp. Colours stay with their stops. */
   setStopPositions: (rampPath: string, positions: number[]) => void;
+  setAgentBusy: (busy: boolean) => void;
 }
 
 
@@ -245,6 +258,7 @@ export const useEditor = create<EditorState>((set, get) => {
     highlightHex: null,
     highlightKey: null,
     selectedKey: null,
+    selectedEffectPath: null,
     selectedKeys: [],
     xray: true,
     includeTransparent: false,
@@ -258,6 +272,7 @@ export const useEditor = create<EditorState>((set, get) => {
     backdrop: '#FFFFFF',
     undoStack: [],
     redoStack: [],
+    agentBusy: false,
 
     setFiles: (files) => set({ files }),
 
@@ -336,6 +351,7 @@ export const useEditor = create<EditorState>((set, get) => {
         highlightHex: null,
         highlightKey: null,
         selectedKey: null,
+        selectedEffectPath: null,
         selectedKeys: [],
         filterHex: null,
         soloLayerId: null,
@@ -406,6 +422,8 @@ export const useEditor = create<EditorState>((set, get) => {
         d.byHex = { ...(edits.byHex ?? {}) };
         d.byIndex = { ...(edits.byIndex ?? {}) };
         d.alpha = { ...(edits.alpha ?? {}) };
+        d.positions = { ...(edits.positions ?? {}) };
+        d.effects = { ...(edits.effects ?? {}) };
         d.names = { ...(edits.names ?? {}) };
         d.groups = edits.groups ? { ...edits.groups } : d.groups;
         d.images = edits.images ? { ...edits.images } : d.images;
@@ -451,6 +469,7 @@ export const useEditor = create<EditorState>((set, get) => {
       d.byIndex = {};
       d.alpha = {};
       d.positions = {};
+      d.effects = {};
       d.names = {};
     }),
 
@@ -503,7 +522,12 @@ export const useEditor = create<EditorState>((set, get) => {
     toggleShowOriginal: () => set((s) => ({ showOriginal: !s.showOriginal })),
     setHighlight: (hex) => set({ highlightHex: hex }),
     setHighlightKey: (key) => set({ highlightKey: key }),
-    selectProperty: (key) => set({ selectedKey: key, highlightKey: key }),
+    selectProperty: (key) => set({ selectedKey: key, highlightKey: key, selectedEffectPath: null }),
+    selectEffect: (path) => set({ selectedEffectPath: path, selectedKey: null, highlightKey: null }),
+    setEffectColor: (path, to) =>
+      commit(`effect → ${to}`, (d) => {
+        d.effects = { ...(d.effects ?? {}), [path]: canonicalHex(to) };
+      }),
     toggleSelected: (key) =>
       set((s) => ({
         selectedKeys: s.selectedKeys.includes(key)
@@ -522,6 +546,7 @@ export const useEditor = create<EditorState>((set, get) => {
         d.positions = { ...(d.positions ?? {}), [rampPath]: [...positions].sort((a, b) => a - b) };
       }),
     setSoloLayer: (id) => set((s) => ({ soloLayerId: s.soloLayerId === id ? null : id })),
+    setAgentBusy: (agentBusy) => set({ agentBusy }),
   };
 });
 

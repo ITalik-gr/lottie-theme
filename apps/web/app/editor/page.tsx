@@ -1,11 +1,13 @@
 'use client';
 
-import { ArrowUpRight, Radio } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, FileJson, Radio } from 'lucide-react';
 import { Canvas } from '@/components/Canvas';
 import { FileTree } from '@/components/FileTree';
 import { LayerTree } from '@/components/LayerTree';
 import { RightPanel } from '@/components/RightPanel';
 import { Toolbar } from '@/components/Toolbar';
+import { useLottieDrop } from '@/lib/drop';
+import { useUnloadGuard } from '@/lib/guard';
 import { useEditor } from '@/lib/store';
 import { useSync } from '@/lib/sync';
 import { cn } from '@/lib/utils';
@@ -18,6 +20,10 @@ export default function EditorPage() {
   // Mounted here rather than in the panel so an agent's edit arrives whether or not the
   // sync section happens to be the one on screen. Outside `next dev` this connects to nothing.
   const sync = useSync();
+  // A drop anywhere over the canvas column, not only over the file tree. The middle of the
+  // screen is where the animation is, so it is where a file gets dragged.
+  const drop = useLottieDrop();
+  useUnloadGuard();
 
   return (
     // The three columns are not equally compressible: the canvas is what the work is
@@ -32,11 +38,29 @@ export default function EditorPage() {
         </div>
       </aside>
 
-      <main className="flex min-h-0 min-w-0 flex-col">
+      <main className="relative flex min-h-0 min-w-0 flex-col" {...drop.handlers}>
         <Toolbar />
         <div className="min-h-0 flex-1">
           <Canvas />
         </div>
+
+        {drop.dragging && (
+          <div className="pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--color-brand)] bg-[var(--color-background)]/80 text-[var(--color-brand-bright)] backdrop-blur-sm">
+            <FileJson className="size-7" />
+            <span className="text-[13px]">Drop to open</span>
+          </div>
+        )}
+
+        {drop.error && (
+          <button
+            onClick={drop.clearError}
+            title="dismiss"
+            className="absolute inset-x-3 bottom-11 z-20 flex items-center gap-1.5 rounded-md bg-[var(--color-destructive)]/10 px-2 py-1.5 text-left text-[12px] text-[var(--color-destructive)]"
+          >
+            <AlertCircle className="size-3.5 shrink-0" />
+            {drop.error}
+          </button>
+        )}
         <footer className="flex h-8 shrink-0 items-center gap-3 overflow-hidden border-t border-[var(--color-line)] px-3 text-[11px] text-[var(--color-fg-mute)]">
           {currentId ? (
             <>

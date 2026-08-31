@@ -3,15 +3,18 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   Ban, Box, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Crosshair,
-  Image as ImageIcon, Layers, RefreshCw, RotateCcw, Scissors, Square, SquareDashed,
+  Eclipse, Image as ImageIcon, Layers, RefreshCw, RotateCcw, Scissors, Square, SquareDashed,
   SquareDashedBottom, Squircle, Type, Video, X,
 } from 'lucide-react';
-import { slotsInSubtree, type TreeNode } from '@lottie-theme/core';
+import { slotsInSubtree, listEffectColors, type EffectColor, type TreeNode } from '@lottie-theme/core';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Swatch } from './Swatch';
 import { propertyHex, useEditor } from '@/lib/store';
+import {
+  ancestorIdsForEffect, ancestorIdsForProperty, effectHex, effectOpacityLabel, effectsOnLayer,
+} from '@/lib/effects';
 import { cn } from '@/lib/utils';
 
 /** Layer types that carry no colour of their own but are still worth showing, because
@@ -40,8 +43,7 @@ const KIND_LABEL: Record<string, string> = {
   'text-stroke': 'text stroke',
 };
 
-/** Which rows are open. It lives above the rows rather than in them so that one button can
- *  fold the whole tree — a row that owned its own state could not be told to close. */
+const Effects = createContext<EffectColor[]>([]);
 const Expansion = createContext<{
   isOpen: (id: string, depth: number) => boolean;
   toggle: (id: string, depth: number) => void;
@@ -79,16 +81,20 @@ function LayerRow({ node, depth }: { node: TreeNode; depth: number }) {
   const slots = useEditor((s) => s.slots);
   const properties = useEditor((s) => s.properties);
   const selectedKey = useEditor((s) => s.selectedKey);
+  const selectedEffectPath = useEditor((s) => s.selectedEffectPath);
   const soloLayerId = useEditor((s) => s.soloLayerId);
   const filterHex = useEditor((s) => s.filterHex);
   const setHighlightKey = useEditor((s) => s.setHighlightKey);
   const selectProperty = useEditor((s) => s.selectProperty);
+  const selectEffect = useEditor((s) => s.selectEffect);
   const selectedKeys = useEditor((s) => s.selectedKeys);
   const toggleSelected = useEditor((s) => s.toggleSelected);
   const setSoloLayer = useEditor((s) => s.setSoloLayer);
   const renameLayer = useEditor((s) => s.renameLayer);
   const edits = useEditor((s) => s.edits);
 
+  const effects = useContext(Effects);
+  const ownEffects = useMemo(() => effectsOnLayer(effects, node), [effects, node]);
   const expansion = useContext(Expansion);
   const open = expansion.isOpen(node.id, depth);
   const setOpen = () => expansion.toggle(node.id, depth);
@@ -105,8 +111,10 @@ function LayerRow({ node, depth }: { node: TreeNode; depth: number }) {
   // anything that does is not worth a row.
   if (filterHex && !subtree.some((i) => slots[i]?.hex === filterHex)) return null;
 
-  const hasChildren = node.children.length > 0 || ownProperties.length > 0;
+  const hasChildren = node.children.length > 0 || ownProperties.length > 0 || ownEffects.length > 0;
   const solo = soloLayerId === node.id;
+  const layerActive =
+    ownProperties.some((p) => p.key === selectedKey) || ownEffects.some((e) => e.path === selectedEffectPath);
   const Icon = TYPE_ICON[node.typeName] ?? Box;
 
   return (
@@ -114,7 +122,7 @@ function LayerRow({ node, depth }: { node: TreeNode; depth: number }) {
       <div
         className={cn(
           'group flex h-8 items-center gap-1.5 rounded-md pr-1.5 transition-colors',
-          solo ? 'bg-[var(--color-brand)]/12' : 'hover:bg-[var(--color-hover)]',
+          solo || layerActive ? 'bg-[var(--color-brand)]/12' : 'hover:bg-[var(--color-hover)]',
         )}
         style={{ paddingLeft: depth * 12 + 4 }}
       >
@@ -203,6 +211,9 @@ function LayerRow({ node, depth }: { node: TreeNode; depth: number }) {
             return (
               <button
                 key={p.key}
+                data-testid="layer-property"
+                data-tree-row={p.key}
+                data-selected={picked || undefined}
                 onMouseEnter={() => setHighlightKey(p.key)}
                 onMouseLeave={() => setHighlightKey(null)}
                 onClick={(e) =>
@@ -249,6 +260,41 @@ function LayerRow({ node, depth }: { node: TreeNode; depth: number }) {
               </button>
             );
           })}
+          {ownEffects.map((e) => {
+            const picked = selectedEffectPath === e.path;
+            const now = effectHex(edits, e);
+            const opacity = effectOpacityLabel(e.opacity);
+            return (
+              <button
+                key={e.path}
+                data-testid="layer-effect"
+                data-tree-row={e.path}
+                data-selected={picked || undefined}
+                onClick={() => selectEffect(e.path)}
+                className={cn(
+                  'flex h-7 w-full items-center gap-2 rounded-md pr-2 text-left transition-colors',
+                  picked ? 'bg-[var(--color-brand)]/15' : 'hover:bg-[var(--color-hover)]',
+                )}
+                style={{ paddingLeft: depth * 12 + 26 }}
+              >
+                <Swatch hex={now} size={13} />
+                <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-dim)]">{now}</span>
+                {now !== e.hex && (
+                  <span
+                    title={`was ${e.hex}`}
+                    className="font-mono text-[10px] tabular-nums text-[var(--color-fg-mute)] line-through"
+                  >
+                    {e.hex}
+                  </span>
+                )}
+                <Eclipse className="size-3 shrink-0 text-[var(--color-fg-mute)]" />
+                <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--color-fg-mute)]">
+                  {e.effect ?? 'effect'}
+                  {opacity ? ` · ${opacity}` : ''}
+                </span>
+              </button>
+            );
+          })}
           {node.children.map((child) => (
             <LayerRow key={child.id} node={child} depth={depth + 1} />
           ))}
@@ -260,14 +306,20 @@ function LayerRow({ node, depth }: { node: TreeNode; depth: number }) {
 
 export function LayerTree() {
   const tree = useEditor((s) => s.tree);
+  const slots = useEditor((s) => s.slots);
+  const original = useEditor((s) => s.original);
   const currentId = useEditor((s) => s.currentId);
   const palette = useEditor((s) => s.palette);
   const filterHex = useEditor((s) => s.filterHex);
   const setFilterHex = useEditor((s) => s.setFilterHex);
+  const selectedKey = useEditor((s) => s.selectedKey);
+  const selectedEffectPath = useEditor((s) => s.selectedEffectPath);
   const soloLayerId = useEditor((s) => s.soloLayerId);
   const setSoloLayer = useEditor((s) => s.setSoloLayer);
   const xrayOn = useEditor((s) => s.xray);
   const toggleXray = useEditor((s) => s.toggleXray);
+
+  const effects = useMemo(() => (original ? listEffectColors(original) : []), [original]);
 
   /** What a row does when the user has not said otherwise: top level open, the rest closed,
    *  until the fold-all button replaces that baseline for the whole tree. */
@@ -280,6 +332,40 @@ export function LayerTree() {
     setBaseline('auto');
     setOverrides({});
   }, [currentId]);
+
+  // Canvas pick (and tree pick of a nested row) has to open the ancestors and bring
+  // the row on screen. The two views otherwise drift: the slot panel fills and the
+  // tree stays folded on a different layer.
+  useEffect(() => {
+    const ids = selectedKey
+      ? ancestorIdsForProperty(tree, slots, selectedKey)
+      : selectedEffectPath
+        ? ancestorIdsForEffect(tree, selectedEffectPath)
+        : null;
+    if (!ids?.length) return;
+    setOverrides((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const id of ids) {
+        if (next[id] !== true) {
+          next[id] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+    const row = selectedKey ?? selectedEffectPath;
+    if (!row) return;
+    let attempts = 0;
+    let raf = 0;
+    const seek = () => {
+      const el = document.querySelector(`[data-tree-row="${CSS.escape(row)}"]`);
+      el?.scrollIntoView({ block: 'nearest' });
+      if (!el && attempts++ < 12) raf = requestAnimationFrame(seek);
+    };
+    raf = requestAnimationFrame(seek);
+    return () => cancelAnimationFrame(raf);
+  }, [selectedKey, selectedEffectPath, tree, slots]);
 
   const expansion = useMemo(() => {
     const fallback = (depth: number) => (baseline === 'auto' ? depth < 1 : baseline === 'open');
@@ -365,12 +451,14 @@ export function LayerTree() {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3" data-testid="layers-scroll">
+        <Effects.Provider value={effects}>
         <Expansion.Provider value={expansion}>
           {tree.map((node) => (
             <LayerRow key={node.id} node={node} depth={0} />
           ))}
         </Expansion.Provider>
+        </Effects.Provider>
       </div>
     </div>
   );
