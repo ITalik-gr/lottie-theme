@@ -1,22 +1,23 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { NextResponse } from 'next/server';
+import { inside, workspace } from './workspace.ts';
 
 /**
- * Development-only bridge to the repository's own `lotties/` folder.
+ * Development-only bridge to a folder of animations on disk.
  *
  * The product itself is entirely client-side — a user's files never leave the browser
- * (see ROADMAP §1). This route exists so that working *on* the tool against the local
- * corpus does not mean re-picking 53 files by hand on every reload. It is disabled
- * outside `next dev`, and refuses any path that escapes the allowed roots.
+ * (see ROADMAP §1). This route exists so that converting a folder does not mean re-picking
+ * fifty files by hand on every reload. It is disabled outside `next dev`, and refuses any
+ * path that escapes the workspace root.
+ *
+ * Which folder that is comes from `LOTTIE_WORKSPACE` / `LOTTIE_DIRS`; see `workspace.ts`
+ * for why there is exactly one root and why the sync hub has to share it.
  */
-
-const repoRoot = resolve(process.cwd(), '../..');
-const ROOTS = ['lotties', 'lotties-light'];
 
 const enabled = process.env.NODE_ENV === 'development';
 
-async function listJson(dir: string, acc: string[]): Promise<void> {
+async function listJson(dir: string, root: string, acc: string[]): Promise<void> {
   let entries: string[];
   try {
     entries = await readdir(dir);
@@ -25,22 +26,14 @@ async function listJson(dir: string, acc: string[]): Promise<void> {
   }
   for (const name of entries) {
     if (name.startsWith('.')) continue;
+    if (name === 'node_modules') continue;
     const full = join(dir, name);
     const s = await stat(full);
-    if (s.isDirectory()) await listJson(full, acc);
+    if (s.isDirectory()) await listJson(full, root, acc);
     // A `.theme.json` sidecar is an edit set, not an animation. Listing one made the
     // editor open it as a document and crash on a file with no layers.
-    else if (name.endsWith('.json') && !name.endsWith('.theme.json')) acc.push(relative(repoRoot, full));
+    else if (name.endsWith('.json') && !name.endsWith('.theme.json')) acc.push(relative(root, full));
   }
-}
-
-/** True only for a path that really sits inside one of the allowed roots. */
-function isAllowed(rel: string): boolean {
-  const full = resolve(repoRoot, rel);
-  return ROOTS.some((root) => {
-    const base = resolve(repoRoot, root);
-    return full === base || full.startsWith(base + sep);
-  });
 }
 
 /**
@@ -72,19 +65,31 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   if (url.searchParams.has('sync')) return probeHub();
 
-  const file = new URL(request.url).searchParams.get('file');
+  const { root, dirs, configured, fromEnv } = workspace();
+  const file = url.searchParams.get('file');
+
   if (file === null) {
     const files: string[] = [];
-    for (const root of ROOTS) await listJson(resolve(repoRoot, root), files);
+    for (const dir of dirs) await listJson(dir, root, files);
     files.sort((a, b) => a.localeCompare(b));
-    return NextResponse.json({ files });
+    // The folders are reported even when they hold nothing. An empty list on its own is
+    // indistinguishable from a folder that is not there, and the editor has to be able to
+    // say which — a misconfigured path used to look exactly like an empty corpus.
+    return NextResponse.json({
+      files,
+      workspace: { root, dirs: dirs.map((dir) => relative(root, dir)), configured, fromEnv },
+    });
   }
 
-  if (!isAllowed(file)) {
+  // Readable means inside one of the browsed folders, not merely inside the workspace. A
+  // root set to a home directory would otherwise hand every JSON file on the machine to
+  // anything that can reach localhost.
+  const full = resolve(root, file);
+  if (!dirs.some((dir) => inside(dir, full))) {
     return NextResponse.json({ error: 'path outside the corpus' }, { status: 403 });
   }
   try {
-    const body = await readFile(resolve(repoRoot, file), 'utf8');
+    const body = await readFile(full, 'utf8');
     return new NextResponse(body, { headers: { 'content-type': 'application/json' } });
   } catch {
     return NextResponse.json({ error: 'not found' }, { status: 404 });

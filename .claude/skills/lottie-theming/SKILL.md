@@ -149,6 +149,24 @@ invert its lightness or replace the file.
 **Check more than one frame.** Layers come and go over time. `render_preview` takes a
 `progress` (0..1) — look at the end as well as the start when anything animates in.
 
+## A whole folder
+
+Every path you exchange with the tools is **relative to the workspace root** — the folder
+the MCP server was started in, or `LOTTIE_WORKSPACE` when that is set. The editor in the
+browser and the sync hub resolve paths against the same root, which is what makes a file
+you name and a file the person has open the same file. Never use an absolute path or one
+that climbs out with `..`; both are refused.
+
+Do not theme the files one by one. Work the theme out on **one** animation, looking at the
+render, then apply that single edit set to the rest — that is what keeps a folder
+consistent, and it is what the editor's batch panel and the CLI's `batch` both do. Files
+whose slot structure differs from the one you worked on still get the parts that travel
+(colour-by-hex), and the report says which ones those were.
+
+The one thing to check before applying broadly: whether the folder is really one family. If
+`read_palette` across a few of them disagrees, theme each group separately rather than
+forcing one map over all of it.
+
 ## Without the MCP server
 
 The same core on the command line, for CI or a quick pass:

@@ -19,7 +19,10 @@ import type { ThemeEdits } from '@lottie-theme/core';
  * edits blind, which is precisely where gradient masks go wrong.
  */
 
-const workspace = new Workspace(process.cwd());
+// Everything the agent can reach is under this folder, and every path it exchanges with
+// the editor and the sync hub is relative to it — so all three read the same variable
+// rather than each defaulting to wherever they happened to be started.
+const workspace = new Workspace(process.env.LOTTIE_WORKSPACE?.trim() || process.cwd());
 const server = new McpServer({ name: 'lottie-theme', version: '0.1.0' });
 
 const editsSchema = z

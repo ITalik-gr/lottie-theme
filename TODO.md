@@ -30,7 +30,7 @@ being skipped in silence.
 ## 3. No warning before leaving with unsaved work — done
 
 Nothing in the app listened for `beforeunload`. A reload threw away the undo stack and, in a
-production build, the dropped documents with it (see 9).
+production build, the dropped documents with it (see 11).
 
 `useUnloadGuard` now asks for confirmation when there are edits that have not been exported,
 or while the agent is mid-run.
@@ -63,7 +63,33 @@ from it rather than restarting.
 
 ---
 
-## 6. The agent panel is not really a chat
+## 6. The folder of animations was one person's checkout — done
+
+The CLI took any directory, the MCP server used its own working directory and the sync hub
+took `--root`, but the editor's dev bridge had `lotties` and `lotties-light` written into
+it, resolved two levels above `apps/web`. Anyone else cloning this got an empty file list
+and nothing saying why.
+
+Worse, the three that *were* generic agreed only by accident. A file's identity in the
+editor is its path relative to a root, and the browser sends that path to the sync hub,
+which resolves it against *its* root — so two roots that disagree is two tools editing
+different files while both report success.
+
+There is now one root, `LOTTIE_WORKSPACE`, read by the dev server, the hub and the MCP
+server, with `LOTTIE_DIRS` choosing the folders inside it to browse. Defaults are the old
+values, so an existing checkout behaves as before. Reading is confined to the browsed
+folders rather than the whole root, and the file panel names the folders it looked in when
+it finds none — a wrong path used to be indistinguishable from an empty one.
+
+Documented in `README.md` (§ Working on a whole folder), `apps/web/.env.example`,
+`CLAUDE.md` and the `lottie-theming` skill, so a person and an agent are told the same
+thing. `.env*.local` is gitignored, which it was not.
+
+Follow-up worth doing: the editor knows its own root and, from the hub probe, the hub's.
+When they differ it should say so in the sync panel instead of quietly addressing the wrong
+tree — the failure this was all about.
+
+## 7. The agent panel is not really a chat
 
 Assistant turns render as bare text with no bubble, tool calls as a one-line name with no
 arguments or result, and there is no send button — Enter is the only way. Thinking is a
@@ -76,7 +102,7 @@ spinner pinned under the log rather than part of it.
 - Per-turn token and cost breakdown; clear-conversation; autoscroll only when already at the
   bottom.
 
-## 7. Choosing a model, and a key for any provider
+## 8. Choosing a model, and a key for any provider
 
 `MODEL` is a constant in `AgentPanel.tsx` and there is one key under one localStorage entry.
 
@@ -89,7 +115,7 @@ spinner pinned under the log rather than part of it.
   binding to a particular SDK. It costs about as much to build as everything above it in
   this list.
 
-## 8. The reference panel matches colours badly
+## 9. The reference panel matches colours badly
 
 Not a UI problem. `matchPalettes` in `packages/core/src/sample.ts` scores candidates with
 
@@ -107,7 +133,7 @@ screenshot whose accent was blue.
 - Verify across `lotties/` and add core tests, since this is the part of the tool that has
   no visual check until the render.
 
-## 9. The reference panel does not explain itself
+## 10. The reference panel does not explain itself
 
 Even fixed, the flow is unclear: drop a screenshot, pick colours, apply — none of it is
 stated, and there is no way to reject one pair out of nine.
@@ -117,7 +143,7 @@ stated, and there is no way to reject one pair out of nine.
 - Hovering a pair already highlights it on the canvas, but nothing says so.
 - Reset the mapping; a real drop target for the image; a larger preview to pick from.
 
-## 10. Nothing but the edits survives a reload
+## 11. Nothing but the edits survives a reload
 
 localStorage holds the edit sets, the file and folder aliases, the last open file and the
 background. It does not hold the documents. In `next dev` this is invisible because the
@@ -130,7 +156,7 @@ dropped again.
   (section, x-ray, checkerboard).
 - Somewhere to see how much is stored and to forget one file.
 
-## 11. Publish `@lottie-theme/core` to npm
+## 12. Publish `@lottie-theme/core` to npm
 
 It is consumed as TypeScript source today, which is why imports carry explicit `.ts`
 extensions and why `erasableSyntaxOnly` is on. That works inside this repository and nowhere
@@ -144,7 +170,7 @@ else.
   rule intact.
 - Version and publish from CI on a tag, not from a laptop.
 
-## 12. Carried over from the README
+## 13. Carried over from the README
 
 - Selecting on the canvas should select in the layer tree, and scroll the row into view.
 - Shadows as first-class colours in the editor. Effect colours are reachable from the core,

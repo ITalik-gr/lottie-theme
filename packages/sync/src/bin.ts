@@ -16,16 +16,22 @@ const flag = (name: string) => {
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`lottie-theme-sync — live bridge between the web editor and a local agent
 
-  --root <dir>    folder to serve and watch (default: current directory)
+  --root <dir>    folder to serve and watch
+                  (default: $LOTTIE_WORKSPACE, else the current directory)
   --port <n>      default ${DEFAULT_PORT}
 
 Start it, open the editor with the dev server, and point your agent's MCP server at the
-same folder. Edits made in either place show up in the other immediately.`);
+same folder. Edits made in either place show up in the other immediately.
+
+The three have to agree on that folder: every path on the wire is relative to it, so a hub
+rooted somewhere else resolves the editor's paths against the wrong tree. Setting
+LOTTIE_WORKSPACE once is what makes them agree without three matching arguments.`);
   process.exit(0);
 }
 
 const hub = new Hub({
-  root: flag('root') ?? process.cwd(),
+  // An empty environment variable means "not set", so `||` rather than `??` inside.
+  root: flag('root') ?? (process.env.LOTTIE_WORKSPACE?.trim() || process.cwd()),
   port: Number(flag('port') ?? DEFAULT_PORT),
   onLog: (line) => console.log(line),
 });

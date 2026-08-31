@@ -75,21 +75,50 @@ export function rejectionMessage(rejected: readonly RejectedFile[]): string | nu
   return `${rejected.length} files ignored — ${rejected.map((r) => r.name).join(', ')}`;
 }
 
-/** Dev-only listing of the repository's `lotties/` folder. Silently yields nothing
- *  in a production build, where the route does not exist. */
-export async function localCorpus(): Promise<LoadedFile[]> {
+/** The folder on disk the dev server is listing, when there is one. */
+export interface WorkspaceInfo {
+  root: string;
+  /** Folders being browsed, relative to the root. Empty when none of them exist. */
+  dirs: string[];
+  /** What configuration asked for, which is what to name when none of them exist. */
+  configured: string[];
+  fromEnv: boolean;
+}
+
+export interface CorpusListing {
+  files: LoadedFile[];
+  /** Null outside `next dev`, where the route does not exist at all. */
+  workspace: WorkspaceInfo | null;
+}
+
+/**
+ * Dev-only listing of a folder of animations on disk.
+ *
+ * Ids are paths relative to the workspace root, and deliberately so: the browser sends the
+ * open file's id to the sync hub as a path, and the hub resolves it against the same root.
+ * Changing the shape of these ids breaks the bridge.
+ *
+ * Yields nothing in a production build, where the route is not part of the bundle.
+ */
+export async function localCorpus(): Promise<CorpusListing> {
   try {
     const res = await fetch('/api/local');
-    if (!res.ok) return [];
-    const { files } = (await res.json()) as { files: string[] };
-    return files.map((path) => ({
-      id: path,
-      name: path.slice(path.lastIndexOf('/') + 1),
-      dir: path.slice(0, path.lastIndexOf('/')),
-      source: 'local' as const,
-    }));
+    if (!res.ok) return { files: [], workspace: null };
+    const { files, workspace } = (await res.json()) as {
+      files: string[];
+      workspace?: WorkspaceInfo;
+    };
+    return {
+      files: files.map((path) => ({
+        id: path,
+        name: path.slice(path.lastIndexOf('/') + 1),
+        dir: path.slice(0, path.lastIndexOf('/')),
+        source: 'local' as const,
+      })),
+      workspace: workspace ?? null,
+    };
   } catch {
-    return [];
+    return { files: [], workspace: null };
   }
 }
 

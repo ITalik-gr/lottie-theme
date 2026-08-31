@@ -38,7 +38,7 @@ packages/mcp    an MCP server, so an AI agent edits through the same core
 packages/sync   the live bridge between the editor and a local agent (development only)
 apps/web        Next.js app (App Router, Tailwind, shadcn/ui, Zustand, lottie-web)
 tools/colors.py the original Python proof of concept, kept as the parity reference
-lotties/        the corpus this was built against — not part of the repository
+lotties/        the default folder of animations to work on — gitignored, bring your own
 scripts/        headless smoke test of the editor
 ```
 
@@ -65,6 +65,53 @@ URL if dev picked another port: `pnpm smoke http://localhost:3001`.
 The tests that walk `lotties/` skip themselves when that folder is not there, so a fresh
 clone is green without it. `pnpm smoke` and `pnpm dev`'s file list need animations of your
 own: drop them into `lotties/` or straight onto the page.
+
+## Working on a whole folder
+
+Dropping files onto the page is enough for one animation. For a folder of them — the case
+this was built for — point the tools at it instead, and the file list, the batch panel, the
+live bridge and an agent all address the same files by the same names.
+
+Copy `apps/web/.env.example` to `apps/web/.env.local`:
+
+```bash
+LOTTIE_WORKSPACE=/Users/you/work/brand-animations   # default: the repository root
+LOTTIE_DIRS=source,converted                        # default: lotties,lotties-light
+```
+
+`LOTTIE_WORKSPACE` is the folder every path is relative to, and there is exactly one of it
+on purpose. A file's identity in the editor *is* its path relative to that root: the browser
+sends it to the sync hub, and the hub resolves it against its own root. Two roots that
+disagree is two tools confidently editing different files, so `pnpm sync` and the MCP server
+read the same variable rather than each defaulting to wherever they were started.
+
+`LOTTIE_DIRS` is which folders inside it to list — `source` for the originals and
+`converted` for the results is the usual shape, and the CLI's `batch` writes the second from
+the first. A listed folder that does not exist is skipped, and the file panel says which
+ones it looked for, so a wrong path does not read as an empty folder.
+
+None of this reaches the deployed app. It has no server and cannot read a disk; the local
+folder bridge (`app/api/local/route.dev.ts`) is excluded from the production build, which is
+what keeps the shipped editor a pile of static files where nobody's animation is uploaded
+anywhere.
+
+Converting the folder is two commands: work out the theme on one animation, then apply that
+one edit set to all of them. `batch` deliberately has no opinion of its own — it takes a
+`--theme` and nothing else, so every file in the folder is recoloured by the same decisions
+you checked on the first.
+
+```bash
+# a light theme from one file, saved as an edit set
+node packages/cli/src/cli.ts suggest source/hero.json converted/hero.json \
+  --save-theme light.theme.json
+
+# the same edit set over the whole folder, keeping its structure
+node packages/cli/src/cli.ts batch source converted --theme light.theme.json
+```
+
+Which is also the workflow in the editor: open one animation, get it right by eye, then the
+batch panel applies that edit set across the rest and shows you each result before you
+download them.
 
 ## Command line
 

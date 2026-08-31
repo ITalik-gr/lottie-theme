@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEditor } from '@/lib/store';
 import { useLottieDrop } from '@/lib/drop';
-import { filesFromInput, loadLocal, localCorpus, rejectionMessage } from '@/lib/files';
+import {
+  filesFromInput, loadLocal, localCorpus, rejectionMessage, type WorkspaceInfo,
+} from '@/lib/files';
 import { cn } from '@/lib/utils';
 
 /** The inline field both folders and files rename through. Escape abandons the edit,
@@ -130,6 +132,8 @@ export function FileTree() {
   const renameFolder = useEditor((s) => s.renameFolder);
   const picker = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The folder on disk being listed, when the dev server is serving one. */
+  const [space, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const drop = useLottieDrop();
   /** Folders the user has closed. Absent means open, so a new folder appears expanded. */
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -158,10 +162,14 @@ export function FileTree() {
 
     const poll = async (first: boolean) => {
       if (cancelled) return;
-      const list = await localCorpus();
+      const { files: list, workspace } = await localCorpus();
       if (cancelled) return;
+      setWorkspace(workspace);
       if (!list.length) {
-        if (first) return;
+        // Outside `next dev` there is no route and nothing to poll for. Inside it, a
+        // configured folder that is currently empty is still worth watching: an agent
+        // writing converted files into it is the whole point of the poll.
+        if (first && !workspace) return;
       } else if (first) {
         setFiles(list);
       } else {
@@ -318,6 +326,38 @@ export function FileTree() {
               <br />
               Nothing is uploaded — it all stays in this browser.
             </p>
+
+            {/* Only the dev server can list a folder, and only then is there anything to
+                say about one. A configured path that does not exist used to look exactly
+                like an empty folder, which is a long way to debug from. */}
+            {space && (
+              <p className="mt-3 border-t border-[var(--color-line)] pt-3 text-left text-[11px] leading-relaxed text-[var(--color-fg-mute)]">
+                {space.dirs.length ? (
+                  <>
+                    Watching{' '}
+                    {space.dirs.map((dir) => (
+                      <span key={dir} className="font-mono text-[var(--color-fg-dim)]">
+                        {dir}{' '}
+                      </span>
+                    ))}
+                    in <span className="font-mono">{space.root}</span> — it holds no
+                    animations yet.
+                  </>
+                ) : (
+                  <>
+                    No folder to list:{' '}
+                    <span className="font-mono text-[var(--color-fg-dim)]">
+                      {space.configured.join(', ')}
+                    </span>{' '}
+                    {space.configured.length > 1 ? 'do' : 'does'} not exist under{' '}
+                    <span className="font-mono">{space.root}</span>. Set{' '}
+                    <span className="font-mono">LOTTIE_DIRS</span> in{' '}
+                    <span className="font-mono">apps/web/.env.local</span> to point at your
+                    own.
+                  </>
+                )}
+              </p>
+            )}
           </div>
         )}
 
