@@ -8,6 +8,7 @@ import { RightPanel } from '@/components/RightPanel';
 import { Toolbar } from '@/components/Toolbar';
 import { useLottieDrop } from '@/lib/drop';
 import { useUnloadGuard } from '@/lib/guard';
+import { useResizablePanel } from '@/lib/resizable';
 import { useEditor } from '@/lib/store';
 import { useSync } from '@/lib/sync';
 import { cn } from '@/lib/utils';
@@ -23,12 +24,25 @@ export default function EditorPage() {
   // A drop anywhere over the canvas column, not only over the file tree. The middle of the
   // screen is where the animation is, so it is where a file gets dragged.
   const drop = useLottieDrop();
+  // The right panel holds the two things that need room — the agent's conversation and the
+  // reference mapping — so it is the one worth dragging wider. The bounds keep both ends
+  // usable: narrower and the palette rows wrap, wider and the canvas is the one squeezed.
+  const rail = useResizablePanel({
+    storageKey: 'lottie-theme:right-panel',
+    initial: 356,
+    min: 280,
+    max: 720,
+  });
   useUnloadGuard();
 
   return (
     // The three columns are not equally compressible: the canvas is what the work is
-    // looked at on, so the two panels give up width first on a smaller laptop screen.
-    <div className="grid h-screen grid-cols-[216px_1fr_312px] bg-[var(--color-background)] xl:grid-cols-[260px_1fr_356px] 2xl:grid-cols-[300px_1fr_396px]">
+    // looked at on, so the left panel gives up width first on a smaller laptop screen. The
+    // right one is whatever the user dragged it to.
+    <div
+      className="grid h-screen grid-cols-[216px_1fr_var(--rail)] bg-[var(--color-background)] xl:grid-cols-[260px_1fr_var(--rail)] 2xl:grid-cols-[300px_1fr_var(--rail)]"
+      style={{ '--rail': `${rail.width}px` } as React.CSSProperties}
+    >
       <aside className="grid min-h-0 min-w-0 grid-rows-[minmax(140px,34%)_1fr] overflow-hidden border-r border-[var(--color-line)] bg-[var(--color-panel)]">
         <div className="min-h-0 min-w-0 border-b border-[var(--color-line)]">
           <FileTree />
@@ -98,7 +112,21 @@ export default function EditorPage() {
         </footer>
       </main>
 
-      <aside className="min-h-0 min-w-0 overflow-hidden border-l border-[var(--color-line)] bg-[var(--color-panel)]">
+      <aside className="relative min-h-0 min-w-0 overflow-hidden border-l border-[var(--color-line)] bg-[var(--color-panel)]">
+        {/* The grab area is wider than the line it sits on: a 1px border is not a target,
+            and the alternative is hunting for the edge. Double-click puts it back. */}
+        <div
+          {...rail.handle}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="resize the panel"
+          title="drag to resize · double-click to reset"
+          className={cn(
+            'absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize',
+            'after:absolute after:inset-y-0 after:left-1 after:w-px after:transition-colors',
+            rail.dragging ? 'after:bg-[var(--color-brand)]' : 'hover:after:bg-[var(--color-brand)]/50',
+          )}
+        />
         <RightPanel />
       </aside>
     </div>

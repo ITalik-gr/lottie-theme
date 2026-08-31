@@ -194,7 +194,7 @@ function RampEditor({ ramp }: { ramp: GradientRamp }) {
               if (e.key === 'Escape') setDraft(null);
             }}
             aria-label="stop position"
-            className="w-14 rounded-md border border-[var(--color-line)] bg-transparent px-1.5 py-1 text-[12px] tabular-nums outline-none focus:border-[var(--color-brand)]"
+            className="w-14 rounded-md border border-[var(--color-line)] bg-transparent px-1.5 py-1 text-[12px] tabular-nums"
           />
           <span className="text-[11px] text-[var(--color-fg-mute)]">%</span>
         </div>

@@ -140,8 +140,18 @@ The `agent` tab takes your own Anthropic API key and works on the open animation
 description — "make a light version and check it on white", "the glow around the badge
 still looks dark, fix just that". Requests go from the page straight to the provider;
 there is no backend here to route them through, which is the same reason your files never
-leave the browser. The key is stored in that browser and nowhere else, and the editor
-shows a running cost estimate since it is billed to your account.
+leave the browser. The key is stored in that browser and nowhere else.
+
+Pick the model and how hard it works from the strip above the conversation. Effort is the
+lever worth reaching for before the model: most recolouring does not need the depth that a
+gradient fading into the backdrop does, and it is billed by the token. The endpoint can be
+pointed at a gateway or proxy that speaks the Anthropic API.
+
+It is your account being billed, so the panel is built to be interruptible and to say what
+it costs: a running estimate that counts cache reads and writes as well as plain tokens, a
+spend ceiling per instruction that stops and asks rather than continuing quietly, a Stop
+button, and a conversation whose prefix is cached and whose stale tool results are dropped
+between turns — without which a single "make this light" ran to a few dollars.
 
 The agent has the same operations you do — palette, slots, layer tree, theme suggestion,
 apply — plus `look_at_canvas`, which hands it a picture of the current render. That one

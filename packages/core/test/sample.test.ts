@@ -138,6 +138,78 @@ describe('matchPalettes', () => {
     expect(map['#38E887']).toBe('#008934');
   });
 
+  it('does not drop a rare accent onto a rare grey', () => {
+    // The real failure: an investment card's animation against a screenshot of the page it
+    // had to sit on. Green, blue and teal were the least-used colours of the animation and
+    // black was the least-used of the screenshot, so prominence alone paired all three
+    // with black — three accents deleted in one click.
+    const source = [
+      { hex: '#1B1C21', weight: 400 },
+      { hex: '#FFFFFF', weight: 300 },
+      { hex: '#9FA3B0', weight: 120 },
+      { hex: '#11E598', weight: 20 },
+      { hex: '#4C6EFC', weight: 14 },
+      { hex: '#4CC7BA', weight: 8 },
+    ];
+    const reference = [
+      { hex: '#FFFFFF', share: 0.62 },
+      { hex: '#E6E6E6', share: 0.18 },
+      { hex: '#C0CDFF', share: 0.1 },
+      { hex: '#0024FF', share: 0.07 },
+      { hex: '#000000', share: 0.03 },
+    ];
+    const pairs = matchPalettes(source, reference);
+    const map = Object.fromEntries(pairs.map((p) => [p.from, p.to]));
+
+    for (const accent of ['#11E598', '#4C6EFC', '#4CC7BA']) {
+      expect(map[accent]).not.toBe('#000000');
+      // and not onto any of the greys either
+      expect(['#FFFFFF', '#E6E6E6', '#000000']).not.toContain(map[accent]);
+    }
+  });
+
+  it('lets the colour with a real match claim it first', () => {
+    // Reuse is discouraged, so whoever is settled first takes the good target. Going in
+    // prominence order, a green with no counterpart anywhere claimed the reference's only
+    // blue — and the animation's actual blue was left with a pale lavender.
+    const source = [
+      { hex: '#1B1C21', weight: 1 }, { hex: '#FFFFFF', weight: 1 }, { hex: '#9FA3B0', weight: 1 },
+      { hex: '#11E598', weight: 1 }, { hex: '#4C6EFC', weight: 1 }, { hex: '#4CC7BA', weight: 1 },
+    ];
+    const reference = [
+      { hex: '#FFFFFF', share: 0.6 }, { hex: '#E6E6E6', share: 0.2 },
+      { hex: '#0024FF', share: 0.12 }, { hex: '#C0CDFF', share: 0.09 },
+      { hex: '#000000', share: 0.02 },
+    ];
+    const pairs = matchPalettes(source, reference);
+    const map = Object.fromEntries(pairs.map((p) => [p.from, p.to]));
+
+    // The blue is the only source with a true counterpart, so it gets it.
+    expect(map['#4C6EFC']).toBe('#0024FF');
+    expect(pairs.find((p) => p.from === '#4C6EFC')!.weak).toBe(false);
+    // The green has none, and says so rather than taking the blue's place.
+    expect(pairs.find((p) => p.from === '#11E598')!.weak).toBe(true);
+  });
+
+  it('marks a pair weak when the reference has nothing like the colour', () => {
+    // A green with only blues to land on: answered, but not to be applied unseen.
+    const pairs = matchPalettes(
+      [{ hex: '#FFFFFF', weight: 900 }, { hex: '#11E598', weight: 10 }],
+      [{ hex: '#0A0A0A', share: 0.9 }, { hex: '#0024FF', share: 0.1 }],
+    );
+    expect(pairs.find((p) => p.from === '#11E598')!.weak).toBe(true);
+    expect(pairs.find((p) => p.from === '#FFFFFF')!.weak).toBe(false);
+  });
+
+  it('still answers when the reference is all greys', () => {
+    const pairs = matchPalettes(
+      [{ hex: '#11E598', weight: 10 }],
+      [{ hex: '#FFFFFF', share: 0.9 }, { hex: '#222222', share: 0.1 }],
+    );
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]!.to).toBeTruthy();
+  });
+
   it('does not collapse a whole palette onto one reference colour', () => {
     const source = [
       { hex: '#111111', weight: 4 }, { hex: '#333333', weight: 3 },

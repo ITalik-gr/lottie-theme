@@ -89,49 +89,66 @@ Follow-up worth doing: the editor knows its own root and, from the hub probe, th
 When they differ it should say so in the sync panel instead of quietly addressing the wrong
 tree — the failure this was all about.
 
-## 7. The agent panel is not really a chat
+## 7. The agent panel was not really a chat — done
 
-Assistant turns render as bare text with no bubble, tool calls as a one-line name with no
-arguments or result, and there is no send button — Enter is the only way. Thinking is a
-spinner pinned under the log rather than part of it.
+Assistant turns rendered as bare text with no bubble, tool calls as a one-line name with no
+arguments or result, and there was no send button — Enter was the only way in. Thinking was
+a spinner pinned under the log rather than part of it, and on this model it would have shown
+a pause with nothing in it either way: `display` defaults to omitted, so the reasoning
+arrives as empty blocks unless you ask for the summary.
 
-- Bubbles per role; a Send button that becomes Stop while running.
-- Tool calls as collapsible rows showing arguments and result. Right now "apply_edits"
-  tells you nothing about what was applied.
-- `thinking: { display: "summarized" }` so the reasoning streams instead of showing a pause.
-- Per-turn token and cost breakdown; clear-conversation; autoscroll only when already at the
-  bottom.
+Now: a bubble for what you said and plain text for the reply, streamed reasoning above it,
+a Send button that becomes Stop while running, and tool calls as rows that unfold to show
+the arguments and the result the model was actually handed — `apply_edits` on its own never
+said what was applied. Plus clear-conversation, a token breakdown behind the cost, and
+autoscroll only when the log is already at the bottom, so reading back through a run is not
+dragged away on every token.
 
-## 8. Choosing a model, and a key for any provider
+## 8. Choosing a model — done, except the second provider
 
-`MODEL` is a constant in `AgentPanel.tsx` and there is one key under one localStorage entry.
+`MODEL` was a constant and there was one key under one localStorage entry.
 
-- A model select (Opus 5 / Sonnet 5 / Haiku 4.5) with per-model pricing, and an effort
-  control — `output_config.effort`, low for routine recolouring.
-- A `baseURL` override, which covers gateways and proxies without any new client code.
-- Then, separately: a second adapter for OpenAI-compatible endpoints (OpenRouter, Groq, a
-  local server). That one is not a setting, it is a manual tool loop behind a shared
-  `runAgent()` interface, with `lib/ai/tools.ts` split into a description of the tools and a
-  binding to a particular SDK. It costs about as much to build as everything above it in
-  this list.
+Now a model picker (Opus 5 / Sonnet 5 / Haiku 4.5) carrying each model's own prices into the
+cost readout, an effort control (`output_config.effort` — the lever to reach for before
+changing model, since routine recolouring does not need the depth a gradient does), an
+adjustable spend ceiling, and an endpoint override for a gateway or proxy that speaks the
+Anthropic API.
 
-## 9. The reference panel matches colours badly
+Still to do: an adapter for OpenAI-compatible endpoints (OpenRouter, Groq, a local server).
+That one is not a setting. It is a manual tool loop behind a shared `runAgent()` interface,
+with `lib/ai/tools.ts` split into a description of the tools and a binding to a particular
+SDK, and it costs about as much to build as everything above it in this list.
 
-Not a UI problem. `matchPalettes` in `packages/core/src/sample.ts` scores candidates with
+## 9. The reference panel matched colours badly — done
 
-    cost = rankCost*0.5 + hueCost*0.3 + chromaCost*0.2 + reuseCost
+Not a UI problem. `matchPalettes` in `packages/core/src/sample.ts` paired colours by how
+much of the picture each covered, and nothing else could outweigh that: a green, a blue and
+a teal — the three rarest colours of the animation — all landed on `#000000`, the rarest
+colour of the screenshot.
 
-and **lightness does not appear in it at all**. Colours are paired by how much of the image
-each covers, so a rare accent in the animation lands on the rarest colour of the reference —
-which is why a green, a blue and a teal all mapped to `#000000` at 55-73% confidence on a
-screenshot whose accent was blue.
+Lightness stays out of it, and the comment saying why was right: the point of a reference is
+usually that it is the opposite theme, so pairing dark with dark reproduces exactly what the
+user is trying to escape. Three other things were wrong.
 
-- Lightness distance (OKLCh L) becomes the dominant term; prominence rank drops to a
-  tiebreak.
-- A pair whose cost is over a threshold is not offered at all. No mapping beats a wrong one.
-- Keep a chromatic source off a neutral target, and the reverse.
-- Verify across `lotties/` and add core tests, since this is the part of the tool that has
-  no visual check until the render.
+- **Greys and colours are now ranked separately**, and a colour looks for its match among
+  the reference's colours. Prominence stays the ordering principle without being allowed to
+  pair things that have nothing to do with each other. Crossing over is still possible when
+  the reference has no colour at all — a grey screenshot can still theme an animation.
+- **A wrong hue can now cost enough to matter.** It was spread linearly over half a turn, so
+  a completely wrong hue could never push confidence below 0.65. It saturates at a quarter
+  turn: green against blue is not "60% wrong", it is a different colour.
+- **Sources are settled best-match-first, not most-prominent-first.** Reuse is discouraged,
+  so whoever chooses first takes the good target — and in prominence order a green with no
+  counterpart anywhere claimed the reference's only blue, leaving the animation's actual
+  blue with a pale lavender.
+
+Pairs now carry `weak` when the reference had nothing close. Every source colour is still
+returned — the contract that nothing goes missing is worth keeping — but "apply all" applies
+only the confident ones and says how many it left, since sweeping the guesses in with the
+rest is what did the damage.
+
+Verified on the case from the report: the blue finds the blue at 77%, the greens are
+returned as the guesses they are, and no accent is turned into black.
 
 ## 10. The reference panel does not explain itself
 
@@ -139,7 +156,8 @@ Even fixed, the flow is unclear: drop a screenshot, pick colours, apply — none
 stated, and there is no way to reject one pair out of nine.
 
 - Three visible steps.
-- A checkbox per pair; "apply all" applies what is checked.
+- A checkbox per pair. Weak pairs are excluded from "apply all" and faded already (see 9),
+  but there is still no way to reject a *confident* one you disagree with.
 - Hovering a pair already highlights it on the canvas, but nothing says so.
 - Reset the mapping; a real drop target for the image; a larger preview to pick from.
 

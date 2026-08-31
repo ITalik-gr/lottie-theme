@@ -61,7 +61,6 @@ export function ColorField({
         }}
         className={cn(
           'h-[26px] w-[84px] rounded-md border bg-[var(--color-hover)] px-2 font-mono text-[12px] tabular-nums outline-none',
-          'focus:border-[var(--color-brand)]',
           valid ? 'border-[var(--color-line)]' : 'border-[var(--color-destructive)]',
         )}
       />

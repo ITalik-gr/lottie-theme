@@ -233,7 +233,19 @@ export interface MatchedPair {
   to: string;
   /** 0..1: how well the two matched. Low means the reference had nothing like it. */
   confidence: number;
+  /** The reference had nothing close. The pair is still returned — every source colour is
+   *  accounted for — but it is a guess, and applying it unseen is how a palette ends up
+   *  worse than it started. */
+  weak: boolean;
 }
+
+/** Below this chroma a colour is a grey, and its hue is noise rather than information. */
+const NEUTRAL_CHROMA = 0.04;
+
+/** Confidence under which a pair is marked `weak`. Set where an accent with no counterpart
+ *  in the reference lands: those score around 0.3–0.45, and a correct pairing of colours
+ *  that genuinely correspond scores well above it. */
+const WEAK_BELOW = 0.55;
 
 /**
  * Pair a document's palette with a reference image's palette.
@@ -248,6 +260,13 @@ export interface MatchedPair {
  *
  * A reference colour is discouraged, but not forbidden, from being reused, so a palette
  * cannot collapse onto a single colour.
+ *
+ * Greys and colours are ranked *separately*, and a colour looks for its match among the
+ * reference's colours rather than its greys. Prominence alone put an accent that was rare
+ * in the animation onto whatever was rarest in the reference — a vivid green, blue and
+ * teal all landed on black, because black was the least of the screenshot and they were
+ * the least of the animation. Ranking within each group keeps prominence as the ordering
+ * principle without letting it pair things that have nothing to do with each other.
  */
 export function matchPalettes(
   source: readonly { hex: string; weight?: number }[],
@@ -262,41 +281,80 @@ export function matchPalettes(
       .sort((a, b) => b.amount - a.amount)
       .map((entry, i, all) => ({ ...entry, rank: all.length === 1 ? 0 : i / (all.length - 1) }));
 
-  const sourceRanked = byProminence(source, (s) => s.weight ?? 1);
-  const referenceRanked = byProminence(reference, (r) => r.share ?? 1);
+  const chromaOf = (hex: string) => rgbToOklch(fromHex(hex))[1];
+  const isColour = (hex: string) => chromaOf(hex) > NEUTRAL_CHROMA;
+
+  /** Rank within a group, so "the biggest area" means the biggest of the greys or the
+   *  biggest of the colours — never the biggest of a pile that mixes both. */
+  const ranked = <T extends { hex: string }>(list: readonly T[], amount: (item: T) => number) => {
+    const colours = byProminence(list.filter((x) => isColour(x.hex)), amount);
+    const greys = byProminence(list.filter((x) => !isColour(x.hex)), amount);
+    return { colours, greys, all: [...colours, ...greys] };
+  };
+
+  const sourceRanked = ranked(source, (s) => s.weight ?? 1);
+  const referenceRanked = ranked(reference, (r) => r.share ?? 1);
+
+  /** What it would cost to pair these two, before any reuse penalty. */
+  const baseCost = (
+    sourceHex: string,
+    sourceRank: number,
+    candidate: { item: { hex: string }; rank: number },
+    crossing: boolean,
+  ) => {
+    const [, sourceC, sourceH] = rgbToOklch(fromHex(sourceHex));
+    const [, candidateC, candidateH] = rgbToOklch(fromHex(candidate.item.hex));
+    const rankCost = Math.abs(candidate.rank - sourceRank);
+    // Hue only matters when both colours are actually coloured; comparing the hue of two
+    // greys is comparing noise.
+    const comparable = Math.min(sourceC, candidateC) > NEUTRAL_CHROMA;
+    // Saturating at a quarter turn, not spread over a half turn. Green against blue is not
+    // "60% wrong", it is simply a different colour, and a linear scale to 180° meant a hue
+    // could never cost enough to make a pair read as the guess it is.
+    const hueCost = comparable
+      ? Math.min(1, Math.min(Math.abs(candidateH - sourceH), 360 - Math.abs(candidateH - sourceH)) / 90)
+      : 0;
+    // Within a group this separates a vivid accent from a muted one.
+    const chromaCost = Math.abs(candidateC - sourceC) * 2;
+    return rankCost * 0.35 + hueCost * 0.5 + chromaCost * 0.2 + (crossing ? 0.35 : 0);
+  };
+
+  /** Each source with the pool it may draw from and the best it could hope for. */
+  const wanting = sourceRanked.all.map(({ item, rank }) => {
+    const wantsColour = rgbToOklch(fromHex(item.hex))[1] > NEUTRAL_CHROMA;
+    // Its own kind first. Crossing over is allowed only when the reference has none of
+    // that kind at all — a screenshot with no colour in it can still theme an animation,
+    // and refusing to answer would be worse than answering with the nearest grey.
+    const preferred = wantsColour ? referenceRanked.colours : referenceRanked.greys;
+    const crossing = preferred.length === 0;
+    const pool = crossing ? referenceRanked.all : preferred;
+    const costs = pool.map((candidate) => ({ candidate, cost: baseCost(item.hex, rank, candidate, crossing) }));
+    return { item, rank, costs, floor: Math.min(...costs.map((c) => c.cost)) };
+  });
+
+  // Settled in order of how well each source can possibly do, not in order of prominence.
+  // Reuse is discouraged, so whoever chooses first takes the good target — and going by
+  // prominence meant a green with no counterpart could claim the reference's only blue,
+  // leaving the animation's actual blue to a pale lavender. The colour with a real match
+  // states its claim first, and the one with nothing to match takes what is left.
   const used = new Map<string, number>();
 
-  return sourceRanked
-    .map(({ item, rank: sourceRank }) => {
-      const [, sourceC, sourceH] = rgbToOklch(fromHex(item.hex));
-      let best = referenceRanked[0]!;
+  return wanting
+    .slice()
+    .sort((a, b) => a.floor - b.floor)
+    .map(({ item, costs }) => {
+      let best = costs[0]!;
       let bestCost = Infinity;
-
-      for (const candidate of referenceRanked) {
-        const [, candidateC, candidateH] = rgbToOklch(fromHex(candidate.item.hex));
-        const rankCost = Math.abs(candidate.rank - sourceRank);
-        // Hue only matters when both colours are actually coloured; comparing the hue of
-        // two greys is comparing noise.
-        const chromatic = Math.min(sourceC, candidateC) > 0.04;
-        const hueCost = chromatic
-          ? Math.min(Math.abs(candidateH - sourceH), 360 - Math.abs(candidateH - sourceH)) / 180
-          : 0;
-        // A saturated source colour should not land on a grey, and vice versa.
-        const chromaCost = Math.abs(candidateC - sourceC) * 2;
-        const reuseCost = (used.get(candidate.item.hex) ?? 0) * 0.2;
-        const cost = rankCost * 0.5 + hueCost * 0.3 + chromaCost * 0.2 + reuseCost;
+      for (const entry of costs) {
+        const cost = entry.cost + (used.get(entry.candidate.item.hex) ?? 0) * 0.2;
         if (cost < bestCost) {
           bestCost = cost;
-          best = candidate;
+          best = entry;
         }
       }
-
-      used.set(best.item.hex, (used.get(best.item.hex) ?? 0) + 1);
-      return {
-        from: item.hex,
-        to: best.item.hex,
-        confidence: Math.max(0, Math.min(1, 1 - bestCost)),
-      };
+      used.set(best.candidate.item.hex, (used.get(best.candidate.item.hex) ?? 0) + 1);
+      const confidence = Math.max(0, Math.min(1, 1 - bestCost));
+      return { from: item.hex, to: best.candidate.item.hex, confidence, weak: confidence < WEAK_BELOW };
     })
     .sort((a, b) => b.confidence - a.confidence);
 }

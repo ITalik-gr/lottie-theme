@@ -1,6 +1,7 @@
 'use client';
 
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
+import type { BetaToolRunContext } from '@anthropic-ai/sdk/lib/tools/BetaRunnableTool';
 // The SDK's Zod helper targets the v4 schema types; zod 3.25 ships them under /v4.
 import { z } from 'zod/v4';
 import {
@@ -20,6 +21,23 @@ import { captureCanvas } from './canvas';
 
 const json = (value: unknown) => JSON.stringify(value, null, 2);
 
+/** What a tool call did, for the panel to show. A row that says only `apply_edits` tells
+ *  nobody what was applied, and the whole point of watching an agent work is being able to
+ *  disagree with it early. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+  /** Text the model was handed back, or a note for a result that is a picture. */
+  result: string;
+}
+
+/** A tool result as one line the panel can show without unfolding it. */
+function summarise(result: string | Array<{ type: string }>): string {
+  if (typeof result === 'string') return result;
+  return result.map((block) => (block.type === 'image' ? '[a picture of the canvas]' : '')).join('\n');
+}
+
 const editsSchema = z.object({
   byHex: z.record(z.string(), z.string()).optional().describe('Source colour → target colour, applied everywhere it appears.'),
   byIndex: z.record(z.string(), z.string()).optional().describe('Slot index → colour, for one slot only.'),
@@ -27,7 +45,7 @@ const editsSchema = z.object({
   groups: z.record(z.string(), z.array(z.number())).optional(),
 });
 
-export function buildTools() {
+export function buildTools(onCall?: (call: ToolCall) => void) {
   const state = () => useEditor.getState();
 
   const readPalette = betaZodTool({
@@ -168,7 +186,24 @@ export function buildTools() {
     },
   });
 
-  return [readPalette, listSlots, layerTree, suggest, applyEdits, lookAtCanvas];
+  const tools = [readPalette, listSlots, layerTree, suggest, applyEdits, lookAtCanvas];
+  if (!onCall) return tools;
+
+  // Reporting is wrapped around the tools rather than written into each one: there are six
+  // of them and the reporting has nothing to do with what any of them means.
+  return tools.map((tool) => ({
+    ...tool,
+    run: async (args: never, context?: BetaToolRunContext) => {
+      const result = await tool.run(args, context);
+      onCall({
+        id: context?.toolUse.id ?? tool.name,
+        name: tool.name,
+        input: args,
+        result: summarise(result),
+      });
+      return result;
+    },
+  }));
 }
 
 export const SYSTEM_PROMPT = `You retheme Lottie animations inside a browser editor. The user has one animation open; your tools act on it.

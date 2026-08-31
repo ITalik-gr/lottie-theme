@@ -6,6 +6,7 @@ import { decodeImage, type Pixels } from '@/lib/raster';
 import { useEditor } from '@/lib/store';
 import { AlertCircle, ArrowRight, ImagePlus, Pipette, Target, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Swatch } from './Swatch';
 
 /**
@@ -55,6 +56,9 @@ export function ReferencePanel() {
       URL.revokeObjectURL(url);
     }
   };
+
+  /** The pairs "apply all" is willing to apply without being looked at first. */
+  const confident = (pairs ?? []).filter((p) => !p.weak);
 
   const propose = () => {
     if (!palette.length) return;
@@ -183,7 +187,8 @@ export function ReferencePanel() {
                 key={pair.from}
                 onMouseEnter={() => setHighlight(pair.from)}
                 onMouseLeave={() => setHighlight(null)}
-                className="row mb-1"
+                className={cn('row mb-1', pair.weak && 'opacity-55')}
+                title={pair.weak ? 'the reference has nothing like this colour — look before applying' : undefined}
               >
                 <Swatch hex={pair.from} size={22} />
                 <ArrowRight className="size-3 shrink-0 text-[var(--color-fg-mute)]" />
@@ -200,19 +205,29 @@ export function ReferencePanel() {
               </div>
             ))}
 
-            {pairs && pairs.length > 0 && (
+            {/* "Apply all" applies the ones worth applying. A weak pair is a colour the
+                reference had no answer for, and sweeping those in with the rest is how
+                three accents became black in one click — they stay for you to decide. */}
+            {confident.length > 0 && (
               <Button
                 size="sm"
                 onClick={() =>
                   applyEdits('reference mapping', {
                     version: 1,
-                    byHex: Object.fromEntries(pairs.map((p) => [p.from, p.to])),
+                    byHex: Object.fromEntries(confident.map((p) => [p.from, p.to])),
                   })
                 }
                 className="mt-1 w-full"
               >
-                apply all {pairs.length}
+                apply {confident.length} of {pairs!.length}
               </Button>
+            )}
+
+            {pairs && confident.length < pairs.length && (
+              <p className="mt-1.5 text-[11px] leading-snug text-[var(--color-fg-mute)]">
+                {pairs.length - confident.length} faded above had no close match in the
+                image. Apply them one at a time if you want them.
+              </p>
             )}
           </>
         )}

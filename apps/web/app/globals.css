@@ -105,6 +105,24 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/**
+ * What a bare `border` is coloured.
+ *
+ * Tailwind v4 changed the default from a grey to `currentColor`. The shadcn primitives all
+ * write plain `border`, and popovers set `text-popover-foreground` — so every menu, select
+ * and dialog in the app was drawing a near-white 1px rectangle around itself. It read as a
+ * stray focus outline, which is what it was mistaken for.
+ */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-line);
+  }
+}
+
 html,
 body {
   height: 100%;
@@ -180,14 +198,27 @@ input[type='color']::-webkit-color-swatch {
  */
 a:focus-visible,
 button:focus-visible,
-input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
 summary:focus-visible,
 [tabindex]:not([tabindex='-1']):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
   border-radius: 4px;
+}
+
+/**
+ * Fields already draw a border, so an offset outline puts a second ring around the first —
+ * a hard blue rectangle floating off a hard blue edge. They get one mark instead: the
+ * border takes the accent and a soft ring sits directly on it.
+ *
+ * Range and colour inputs are excluded: neither has a border to tint, and both draw their
+ * own control that an outline would fence in.
+ */
+input:not([type='range']):not([type='color']):not([type='checkbox']):not([type='radio']):focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--indigo) 22%, transparent);
 }
 
 /* Radix moves focus into the content it opens; that is machinery, not a focus ring. */
