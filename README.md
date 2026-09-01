@@ -1,117 +1,57 @@
-# Lottie Theme Studio
+# Lottie Theme
 
-Turn a dark-theme Lottie animation into a light one (or the other way round) without
-After Effects — with visual colour identification, an auto-proposed opposite theme and
-batch processing.
+Turn a dark-theme Lottie animation into a light one, or the other way round, without After
+Effects.
 
-**[lottie.italik.dev](https://lottie.italik.dev)** — the editor runs entirely in your
-browser. Your files are never uploaded and there is no account to make.
-
-It exists because the source file is usually gone, the exporter scattered colour across
-eight different shapes of JSON, and "invert the lightness" produces washed-out grey and
-dark halos on a white page.
-
-> The browser is the whole product, but it is not the whole tool. Clone the repository,
-> open it with an AI agent, and the agent gets the same core through an MCP server plus
-> the two things the page cannot give it: it can *look* at what it rendered, and it can
-> reach the colours no palette shows — bitmaps baked into the file, the colour on a drop
-> shadow. See [Working with an agent](#working-with-an-agent).
-
-## Before and after
+**[lottie.italik.dev](https://lottie.italik.dev)** — runs entirely in your browser. Nothing
+is uploaded and there is no account to make.
 
 | dark, as it shipped | light, converted here |
 | --- | --- |
 | ![dark](examples/card.dark.png) | ![light](examples/card.light.png) |
 | ![dark](examples/badge.dark.png) | ![light](examples/badge.light.png) |
 
-Both started from `suggest_theme` and neither was finished by it. The progress bar carries
-a striped PNG baked into the file — invisible on a dark page, a grey hatch spilling past
-the rounded track on a white one — and the badge's glow is a colour on a Drop Shadow
-effect, which no palette lists. Rendering the result is how both were found.
+## Why it exists
 
-## Layout
+The source `.aep` is usually gone, the exporter scattered colour across eight different
+shapes of JSON, and "invert the lightness" produces washed-out grey and dark halos.
 
-```
-packages/core   @lottie-theme/core — all the logic, no UI dependencies
-packages/cli    lottie-theme — the same logic on the command line, for CI and batches
-packages/mcp    an MCP server, so an AI agent edits through the same core
-packages/sync   the live bridge between the editor and a local agent (development only)
-apps/web        Next.js app (App Router, Tailwind, shadcn/ui, Zustand, lottie-web)
-tools/colors.py the original Python proof of concept, kept as the parity reference
-lotties/        the default folder of animations to work on — gitignored, bring your own
-scripts/        headless smoke test of the editor
-```
+Both examples above started from `suggest_theme` and neither was finished by it. The
+progress bar carries a striped PNG baked into the file — invisible on a dark page, a grey
+hatch spilling past the rounded track on a white one. The badge's glow is a colour on a
+Drop Shadow effect, which no palette lists. Rendering the result is how both were found.
 
-The web app, the CLI and the MCP server are thin shells over `core`. Nothing
-about how a colour is found or changed is implemented twice, so an animation edited by
-hand and one edited by a script come out the same.
+## Three ways to use it
 
-## Running it
+| | what it is for |
+| --- | --- |
+| **[The editor](https://lottie.italik.dev)** | one animation, by eye. Click a shape, see every colour under the pointer, recolour it. |
+| **The CLI** | a folder of them, or CI. Work the theme out once, apply that edit set to all. |
+| **An MCP server** | an agent that can *look* at what it rendered, and reach the colours no palette shows. |
+
+All three are thin shells over `packages/core`. Nothing about how a colour is found or
+changed is implemented twice, so a file edited by hand and one edited by a script come out
+identical.
+
+## Install
+
+Needs Node 22.18+ and pnpm.
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:3000
-pnpm sync         # live bridge to a local agent, optional — see below
-pnpm test         # core unit tests + parity against tools/colors.py
+pnpm dev          # the editor on http://localhost:3000
+pnpm test         # core unit tests + parity against the Python PoC
 pnpm typecheck
 pnpm smoke        # headless browser check; needs `pnpm dev` running
 ```
 
-`pnpm smoke` drives the running app through the system Chrome and checks the things unit
-tests cannot: that lottie-web mounts an SVG, that a palette edit reaches the canvas, that
-dragging a gradient stop reaches the rendered SVG, and that undo restores it. Pass a base
-URL if dev picked another port: `pnpm smoke http://localhost:3001`.
+`pnpm smoke` drives the running app through the system Chrome and checks what unit tests
+cannot: that lottie-web mounts an SVG, that a palette edit reaches the canvas, that
+dragging a gradient stop reaches the rendered SVG, and that undo restores it.
 
-The tests that walk `lotties/` skip themselves when that folder is not there, so a fresh
-clone is green without it. `pnpm smoke` and `pnpm dev`'s file list need animations of your
-own: drop them into `lotties/` or straight onto the page.
-
-## Working on a whole folder
-
-Dropping files onto the page is enough for one animation. For a folder of them — the case
-this was built for — point the tools at it instead, and the file list, the batch panel, the
-live bridge and an agent all address the same files by the same names.
-
-Copy `apps/web/.env.example` to `apps/web/.env.local`:
-
-```bash
-LOTTIE_WORKSPACE=/Users/you/work/brand-animations   # default: the repository root
-LOTTIE_DIRS=source,converted                        # default: lotties,lotties-light
-```
-
-`LOTTIE_WORKSPACE` is the folder every path is relative to, and there is exactly one of it
-on purpose. A file's identity in the editor *is* its path relative to that root: the browser
-sends it to the sync hub, and the hub resolves it against its own root. Two roots that
-disagree is two tools confidently editing different files, so `pnpm sync` and the MCP server
-read the same variable rather than each defaulting to wherever they were started.
-
-`LOTTIE_DIRS` is which folders inside it to list — `source` for the originals and
-`converted` for the results is the usual shape, and the CLI's `batch` writes the second from
-the first. A listed folder that does not exist is skipped, and the file panel says which
-ones it looked for, so a wrong path does not read as an empty folder.
-
-None of this reaches the deployed app. It has no server and cannot read a disk; the local
-folder bridge (`app/api/local/route.dev.ts`) is excluded from the production build, which is
-what keeps the shipped editor a pile of static files where nobody's animation is uploaded
-anywhere.
-
-Converting the folder is two commands: work out the theme on one animation, then apply that
-one edit set to all of them. `batch` deliberately has no opinion of its own — it takes a
-`--theme` and nothing else, so every file in the folder is recoloured by the same decisions
-you checked on the first.
-
-```bash
-# a light theme from one file, saved as an edit set
-node packages/cli/src/cli.ts suggest source/hero.json converted/hero.json \
-  --save-theme light.theme.json
-
-# the same edit set over the whole folder, keeping its structure
-node packages/cli/src/cli.ts batch source converted --theme light.theme.json
-```
-
-Which is also the workflow in the editor: open one animation, get it right by eye, then the
-batch panel applies that edit set across the rest and shows you each result before you
-download them.
+Bring your own animations — drop them on the page, or put them in `lotties/`, which is
+gitignored. Tests that walk that folder skip themselves when it is absent, so a fresh clone
+is green without it.
 
 ## Command line
 
@@ -128,74 +68,22 @@ fields they do not know, so the file keeps working while carrying its own colour
 `--use-embedded` reads it back. `--reference <file>` refuses to apply position-addressed
 edits to a document whose slot structure differs, falling back to the by-hex parts.
 
-## Working with an agent
+## With an AI agent
 
 The editor is complete on its own. An agent is what makes the *rest* of a file reachable:
-it can look at the render it just produced, and it can change the colours that no palette
-lists — a striped PNG baked into the animation, the colour on a Drop Shadow effect.
+it can look at the render it just produced, and it can change colours no palette lists.
 
-### In the browser, with your own key
-
-The `agent` tab takes your own Anthropic API key and works on the open animation by
-description — "make a light version and check it on white", "the glow around the badge
-still looks dark, fix just that". Requests go from the page straight to the provider;
-there is no backend here to route them through, which is the same reason your files never
-leave the browser. The key is stored in that browser and nowhere else.
-
-Pick the model and how hard it works from the strip above the conversation. Effort is the
-lever worth reaching for before the model: most recolouring does not need the depth that a
-gradient fading into the backdrop does, and it is billed by the token. The endpoint can be
-pointed at a gateway or proxy that speaks the Anthropic API.
-
-It is your account being billed, so the panel is built to be interruptible and to say what
-it costs: a running estimate that counts cache reads and writes as well as plain tokens, a
-spend ceiling per instruction that stops and asks rather than continuing quietly, a Stop
-button, and a conversation whose prefix is cached and whose stale tool results are dropped
-between turns — without which a single "make this light" ran to a few dollars.
-
-The agent has the same operations you do — palette, slots, layer tree, theme suggestion,
-apply — plus `look_at_canvas`, which hands it a picture of the current render. That one
-matters: a gradient fading into the backdrop reads as correct in the JSON and wrong on
-the page. Its edits land in the same undo stack as yours.
-
-### Locally, which is where it gets good
-
-Clone the repository, open it with an MCP-capable agent (Claude Code needs no setup —
-`.mcp.json` points at the local server and the `lottie-theming` skill carries the
-workflow), and ask for what you want in a sentence. Point it at your reference screenshot
-and it will sample the pixels rather than guess a hex, convert the folder, and check its
-own work by rendering it.
-
-What the local agent can do that the page cannot:
-
-- **See its own render.** `render_preview` hands it a PNG on the background the animation
-  will actually sit on. A gradient fading into the backdrop reads as correct in the JSON
-  and shows up as a dark halo on the page; nothing but looking catches it.
-- **Recolour embedded bitmaps.** A quarter of real files carry a PNG, and it is dark like
-  everything else. `recolor_image` moves its pixels towards the colours you asked for and
-  never touches alpha, so a bitmap that doubles as a matte keeps working.
-- **Reach effect colours.** A Drop Shadow carries its own colour outside the shape tree.
-  `list_effects` is the only place it shows up at all.
-- **Sample a reference instead of guessing.** `sample_screenshot` reads the exact colours
-  an image contains, and `verify` takes your planned edit set and reports how far each
-  resulting colour lands from the reference — a near-miss caught as a number, before
-  anything is written.
-- **Do the whole folder**, with the same edit set, in one pass.
-
-### The MCP server
-
-Point any MCP-capable agent at the server and it edits the same files through the same
-core a person does:
+Clone the repository and open it with an MCP-capable agent. Claude Code needs no setup —
+`.mcp.json` points at the local server and the `lottie-theming` skill carries the workflow
+and the traps that took a corpus of 53 files to learn. For anything else:
 
 ```jsonc
 // .mcp.json
 { "mcpServers": { "lottie-theme": { "command": "npx", "args": ["-y", "lottie-theme-mcp"] } } }
 ```
 
-`CLAUDE.md` explains the project and the `lottie-theming` skill carries the workflow and
-the traps — gradients that fade into the backdrop, values shared through a reused precomp,
-embedded bitmaps, a colour that lives on an effect — so an agent starts with what took this
-project a corpus of 53 files to learn.
+<details>
+<summary><b>The tools</b></summary>
 
 | tool | what it is for |
 | --- | --- |
@@ -215,41 +103,100 @@ Results are deliberately small — a whole-file dump used to cost twenty thousan
 call. The full form of each is behind a flag (`depth`, `describe`, `explain`, `slots`).
 
 `render_preview` is the one that matters. Without seeing the result of its own edit an
-agent works blind, and blind is exactly where gradient masks go wrong — a ramp that fades
+agent works blind, and blind is exactly where gradient masks go wrong: a ramp that fades
 into the backdrop looks correct in the JSON and wrong on the page. It renders through the
 system Chrome, reused across calls; set `LOTTIE_THEME_CHROME` if it is somewhere unusual.
 
-Every path is confined to the working directory: an agent cannot read or overwrite files
+Every path is confined to the working directory, so an agent cannot read or overwrite files
 elsewhere because something told it to.
 
-### Agent and editor on the same thing
+</details>
 
-Run the bridge in the folder you are working in and the browser and the agent stop being
-two views of the same file that have to be reconciled by hand:
+<details>
+<summary><b>In the browser, with your own key</b></summary>
+
+The `agent` tab takes your own Anthropic API key and works on the open animation by
+description — "make a light version and check it on white", "the glow around the badge
+still looks dark, fix just that". Requests go from the page straight to the provider; there
+is no backend here to route them through, which is the same reason your files never leave
+the browser. The key is stored in that browser and nowhere else. The endpoint can be
+pointed at a gateway that speaks the Anthropic API.
+
+It is your account being billed, so the panel is built to be interruptible and to say what
+it costs: a running estimate that counts cache reads and writes as well as plain tokens, a
+spend ceiling per instruction that stops and asks rather than continuing quietly, a Stop
+button, and a conversation whose prefix is cached and whose stale tool results are dropped
+between turns — without which a single "make this light" ran to a few dollars.
+
+Effort is the lever worth reaching for before the model: most recolouring does not need the
+depth that a gradient fading into the backdrop does, and it is billed by the token.
+
+</details>
+
+<details>
+<summary><b>Agent and editor on the same file</b></summary>
 
 ```bash
 npx lottie-theme-sync        # in the same folder your agent's MCP server runs in
 pnpm dev                     # the editor picks the bridge up on its own
 ```
 
-The `sync` tab then shows the connection, everything either of you has changed, and who
-changed it. What travels between them is the *edit set*, never the animation — so an
-agent's change arrives in the browser the way a click does, lands in the same undo stack,
-and can be rejected with `revert` on that one step.
+What travels between them is the *edit set*, never the animation — so an agent's change
+arrives in the browser the way a click does, lands in the same undo stack, and can be
+rejected with `revert` on that one step.
 
 - The agent sees the file you have open, the colour you have selected and the slot indices
-  behind it (`session_state`), which is what makes "make *this* one white" a sentence it
-  can act on.
+  behind it (`session_state`), which is what makes "make *this* one white" actionable.
 - It can propose a change you watch appear (`push_edits`) instead of writing the file and
   asking you to reload; `apply_edits` still writes, and the editor updates as it does.
-- Nothing is written to disk until you press **write changes to the file**. Autosave would
-  rewrite your sources while you experiment, and it would buy nothing: the agent already
-  sees your unsaved work through the session.
-- If a file changes underneath the editor — you edited the JSON by hand, an agent wrote it
-  directly — the editor says so and offers to reload rather than quietly diverging.
+- Nothing reaches disk until you press **write changes to the file**. Autosave would rewrite
+  your sources while you experiment, and buy nothing: the agent already sees your unsaved
+  work through the session.
+- If a file changes underneath the editor, it says so and offers to reload rather than
+  quietly diverging.
 
-The bridge binds to loopback and exists only in development. The shipped build has no
-socket to open: it is static files, and your animation still never leaves the browser.
+The bridge binds to loopback and exists only in development. The shipped build has no socket
+to open.
+
+</details>
+
+## Working on a whole folder
+
+Dropping files on the page is enough for one animation. For a folder — the case this was
+built for — point the tools at it instead, and the file list, the batch panel, the live
+bridge and an agent all address the same files by the same names.
+
+```bash
+# apps/web/.env.local
+LOTTIE_WORKSPACE=/Users/you/work/brand-animations   # default: the repository root
+LOTTIE_DIRS=source,converted                        # default: lotties,lotties-light
+```
+
+Converting it is two commands — work the theme out on one animation, then apply that one
+edit set to all of them:
+
+```bash
+node packages/cli/src/cli.ts suggest source/hero.json converted/hero.json \
+  --save-theme light.theme.json
+node packages/cli/src/cli.ts batch source converted --theme light.theme.json
+```
+
+<details>
+<summary><b>Why there is exactly one workspace root</b></summary>
+
+A file's identity in the editor *is* its path relative to `LOTTIE_WORKSPACE`: the browser
+sends that path to the sync hub, and the hub resolves it against its own root. Two roots
+that disagree is two tools confidently editing different files, so `pnpm sync` and the MCP
+server read the same variable rather than each defaulting to wherever they were started.
+
+`LOTTIE_DIRS` picks which folders inside it to list. A listed folder that does not exist is
+skipped, and the file panel says which ones it looked for, so a wrong path does not read as
+an empty folder.
+
+None of this reaches the deployed app, which has no server and cannot read a disk. The local
+folder bridge (`app/api/local/route.dev.ts`) is excluded from the production build.
+
+</details>
 
 ## How Lottie stores colour
 
@@ -269,44 +216,45 @@ Poorly documented elsewhere, so, briefly — `@lottie-theme/core` addresses all 
 
 A colour slot is addressed by a serialisable path plus an offset, and slots are numbered in
 layer z-order (`layers` → `assets` recursively). That ordering is the contract that keeps
-slot indices stable, so a saved colour map still applies after a re-import. `packages/core/test/parity.test.ts`
-locks it against the Python PoC over the whole corpus.
+slot indices stable, so a saved colour map still applies after a re-import.
+`packages/core/test/parity.test.ts` locks it against the Python PoC over the whole corpus.
+
+## Layout
+
+```
+packages/core   @lottie-theme/core — all the logic, no UI dependencies
+packages/cli    lottie-theme — the same logic on the command line
+packages/mcp    an MCP server, so an AI agent edits through the same core
+packages/sync   the live bridge between the editor and a local agent (development only)
+apps/web        Next.js app (App Router, Tailwind, shadcn/ui, Zustand, lottie-web)
+tools/colors.py the original Python proof of concept, kept as the parity reference
+lotties/        animations to work on — gitignored, bring your own
+scripts/        headless smoke test of the editor
+```
 
 ## Not done yet
 
 Deliberately, and in roughly this order:
 
 - **Selecting on the canvas should select in the layer tree.** Clicking a shape fills the
-  slot panel, but the layer tree does not move to it or expand to reveal it. The two views
-  should stay in step in both directions, including scrolling the row into view.
+  slot panel, but the tree does not move to it or expand to reveal it.
 - **Shadows should be first-class in the editor.** Effect colours are reachable from the
-  core, the CLI and the MCP server, but the browser cannot see or edit them — they are
-  addressed by path and the editor's palette is built from slots. A shadow needs to appear
-  as an ordinary colour, with its own opacity, next to everything else.
+  core, the CLI and the MCP server, but the browser cannot see them — they are addressed by
+  path and the palette is built from slots.
 - **Re-check `sync` and `agent` end to end.** Both were built early and have not been
-  exercised since the gradient, effect and bitmap work landed. The live bridge in
-  particular carries an edit set that has grown three new fields.
-- Adding and removing gradient stops (positions and colours move today; the count is
-  fixed).
+  exercised since the gradient, effect and bitmap work landed.
+- Adding and removing gradient stops (positions and colours move today; the count is fixed).
 - `packages/sync`'s hub test is timing-sensitive: it watches a file and waits a second for
-  the event, and it fails under load. It wants a deterministic clock, not a longer wait.
+  the event, and fails under load. It wants a deterministic clock, not a longer wait.
 - A published npm build of `@lottie-theme/core`, which is consumed as TypeScript source.
 
 ## Deployment
 
-The editor is a static Next.js app with no backend of its own. On Vercel, point the
-project at this repository and set **Root Directory** to `apps/web`; the Next.js preset
-handles the rest, and no environment variables are needed. Do not override the output
-directory — with a root directory set, Vercel resolves it relative to that, and a path
-like `apps/web/.next` becomes `apps/web/apps/web/.next`. The dev-only bridge to a local
-`lotties/` folder (`app/api/local/route.dev.ts`) is excluded from production builds by
-`pageExtensions`, which is what keeps the shipped app a pile of static files.
-
-## Credits
-
-Built by [italik.dev](https://www.italik.dev/?ref=lottie-editor). Source at
-[github.com/ITalik-gr/lottie-theme](https://github.com/ITalik-gr/lottie-theme).
+A static Next.js app with no backend. On Vercel, point the project at this repository and
+set **Root Directory** to `apps/web`; the preset handles the rest and no environment
+variables are needed. Do not override the output directory — with a root directory set,
+Vercel resolves it relative to that, and `apps/web/.next` becomes `apps/web/apps/web/.next`.
 
 ## Licence
 
-MIT.
+MIT. Built by [italik.dev](https://www.italik.dev/?ref=lottie-editor).

@@ -1,0 +1,31 @@
+# Lottie Theme
+
+> A browser tool that recolours a Lottie animation between dark and light themes without
+> After Effects. It finds every colour the file contains — including the ones no palette
+> lists — proposes the opposite theme, and writes the result back. Files are processed in
+> the browser: nothing is uploaded and there is no account.
+
+The same logic ships three ways: a web editor, a `lottie-theme` CLI, and an MCP server so
+an AI agent edits through the identical core. Nothing about how a colour is found or
+changed is implemented twice.
+
+Colour hides in eight different shapes of Lottie JSON — solid fills and strokes, animated
+keyframes, gradient ramps and their separate alpha ramps, solid layers (`ty:1` → `sc`, a
+hex string outside the shape tree), text, effect colours (a Drop Shadow's own colour,
+which no palette built from fills will show), and PNGs embedded as data URIs. Naive
+lightness inversion fails because of the last two: the effect colour is missed and the
+bitmap stays dark, so a converted file shows dark halos and grey patches on a white page.
+
+## Pages
+
+- [Editor](https://lottie.italik.dev/editor): open a Lottie file, see every colour in it, and recolour it — solid fills, gradients, effects and embedded bitmaps
+- [How Lottie stores colour](https://lottie.italik.dev/docs): the eight shapes a colour takes inside a Lottie document, and why each is easy to get wrong
+
+## Source
+
+- [Repository](https://github.com/ITalik-gr/lottie-theme): the monorepo — core, CLI, MCP server, live bridge and the web app
+- [README](https://github.com/ITalik-gr/lottie-theme#readme): installing it, the CLI commands, and the MCP tool list
+
+## Optional
+
+- [Author](https://italik.dev): who built it

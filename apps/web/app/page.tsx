@@ -101,15 +101,40 @@ const LOCAL = [
   },
 ];
 
+/**
+ * Structured data for the search result, not for the page.
+ *
+ * Without it Google has only the <title> to go on and renders the entry as a bare link;
+ * with it the tool is described as software that costs nothing and runs in a browser,
+ * which is the whole of what a searcher wants to know before clicking.
+ */
+const JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Lottie Theme',
+  url: 'https://lottie.italik.dev',
+  applicationCategory: 'DesignApplication',
+  operatingSystem: 'Any, in a web browser',
+  description:
+    'Recolour a Lottie animation between dark and light themes: find every colour it ' +
+    'contains, propose the opposite theme, and write the result back.',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  author: { '@type': 'Person', name: 'italik', url: 'https://italik.dev' },
+};
+
 export default function Home() {
   return (
     <main className="mx-auto max-w-[900px] px-6 py-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       <div className="mx-auto max-w-[640px] text-center">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] px-3 py-1 text-[11px] tracking-wide text-[var(--color-fg-mute)] uppercase">
           <span className="size-1.5 rounded-full bg-[var(--color-ok)]" />
           runs entirely in your browser
         </span>
-        <h1 className="mt-5 text-[38px] leading-tight font-semibold tracking-tight">Lottie Theme Studio</h1>
+        <h1 className="mt-5 text-[38px] leading-tight font-semibold tracking-tight">Lottie Theme</h1>
         <p className="mt-4 text-[16px] leading-relaxed text-[var(--color-fg-dim)]">
           Turn a dark-theme Lottie animation into a light one — with visual colour
           identification, an auto-proposed opposite theme and batch processing. No After Effects.

@@ -1,6 +1,17 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'How Lottie stores colour',
+  description:
+    'The eight shapes a colour takes inside a Lottie document — solid fills, animated ' +
+    'keyframes, gradients, solid layers, effects, slots and embedded bitmaps — and why ' +
+    'each one is easy to get wrong.',
+  alternates: { canonical: '/docs' },
+};
+
 /**
  * Where colour lives inside a Lottie document.
  *
